@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Poll {
+  id        Int             @id @default(autoincrement())
+  title     String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  questions PollQuestions[] @relation("PollQuestions")
+
+  @@map("polls")
+}
+
+model Question {
+  id        Int              @id @default(autoincrement())
+  createdAt DateTime         @default(now())
+  text      String
+  updatedAt DateTime         @updatedAt
+  polls     PollQuestions[]  @relation("PollQuestions")
+  answers   QuestionAnswer[] @relation("QuestionAnswers")
+
+  @@map("questions")
+}
+
+model Answer {
+  id        Int              @id @default(autoincrement())
+  text      String
+  isCorrect Boolean
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  questions QuestionAnswer[] @relation("QuestionAnswers")
+
+  @@map("answers")
+}
+
+model QuestionAnswer {
+  questionId Int
+  answerId   Int
+  answer     Answer   @relation("QuestionAnswers", fields: [answerId], references: [id])
+  question   Question @relation("QuestionAnswers", fields: [questionId], references: [id])
+
+  @@id([questionId, answerId])
+  @@map("question_answers_table")
+}
+
+model PollQuestions {
+  pollId     Int
+  questionId Int
+  poll       Poll     @relation("PollQuestions", fields: [pollId], references: [id])
+  question   Question @relation("PollQuestions", fields: [questionId], references: [id])
+
+  @@id([pollId, questionId])
+}
+
+model User {
+  id                 String             @id @default(cuid())
+  telegramId         String             @unique
+  username           String             @unique
+  firstName          String
+  lastName           String
+  age                Int
+  registrationStatus RegistrationStatus @default(STARTED)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  current_poll_id    Int?
+
+  @@map("users")
+}
+
+enum RegistrationStatus {
+  STARTED
+  COMPLETED
+}
