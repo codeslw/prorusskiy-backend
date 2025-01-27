@@ -1,25 +1,37 @@
 import { Injectable } from '@nestjs/common';
-import { Poll } from '@prisma/client';
+import { PollRepository } from './poll.repository';
+import { CreatePollDto } from './dto/create-poll.dto';
+import { UpdatePollDto } from './dto/update-poll.dto';
 
 @Injectable()
 export class PollService {
-  create(createPollDto: Poll) {
-    return 'This action adds a new poll';
+  constructor(private readonly pollRepository: PollRepository) {}
+
+  async create(createPollDto: CreatePollDto) {
+    return await this.pollRepository.create(createPollDto);
   }
 
-  findAll() {
-    return `This action returns all poll`;
+  async findOne(id: number) {
+    return await this.pollRepository.findById(id);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} poll`;
+  async findAll() {
+    return await this.pollRepository.findAll();
   }
 
-  update(id: number, updatePollDto: Omit<Poll, "id">) {
-    return `This action updates a #${id} poll`;
+  async findAllPaginated(page: number, size: number) {
+    return await this.pollRepository.findAllPaginated(page, size);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} poll`;
+  async findWithFilters(search?: string, page?: number, size?: number) {
+    return await this.pollRepository.findWithFilters(search, page, size);
+  }
+
+  async update(id: number, updatePollDto: UpdatePollDto) {
+    return await this.pollRepository.update(id, updatePollDto);
+  }
+
+  async remove(id: number) {
+    return await this.pollRepository.delete(id);
   }
 }

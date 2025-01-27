@@ -18,12 +18,13 @@ model Poll {
 }
 
 model Question {
-  id        Int              @id @default(autoincrement())
-  createdAt DateTime         @default(now())
-  text      String
-  updatedAt DateTime         @updatedAt
-  polls     PollQuestions[]  @relation("PollQuestions")
-  answers   QuestionAnswer[] @relation("QuestionAnswers")
+  id         Int                 @id @default(autoincrement())
+  createdAt  DateTime            @default(now())
+  text       String
+  difficulty QuestionDifficulty?
+  updatedAt  DateTime            @updatedAt
+  polls      PollQuestions[]     @relation("PollQuestions")
+  answers    QuestionAnswer[]    @relation("QuestionAnswers")
 
   @@map("questions")
 }
@@ -76,4 +77,11 @@ model User {
 enum RegistrationStatus {
   STARTED
   COMPLETED
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
 }
