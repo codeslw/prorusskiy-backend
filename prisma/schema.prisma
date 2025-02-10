@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -36,7 +37,7 @@ model Answer {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
   questions QuestionAnswer[] @relation("QuestionAnswers")
-
+  
   @@map("answers")
 }
 
@@ -45,7 +46,6 @@ model QuestionAnswer {
   answerId   Int
   answer     Answer   @relation("QuestionAnswers", fields: [answerId], references: [id])
   question   Question @relation("QuestionAnswers", fields: [questionId], references: [id])
-
   @@id([questionId, answerId])
   @@map("question_answers_table")
 }
@@ -63,18 +63,23 @@ model User {
   id                 String             @id @default(cuid())
   telegramId         String             @unique
   username           String             @unique
+  password           String?            // For admin login
   firstName          String
   lastName           String
   age                Int
+  role               UserRole           @default(STUDENT)
+  verificationCode   String?            // For telegram verification
+  verificationExpiry DateTime?          // Code expiry time
   registrationStatus RegistrationStatus @default(STARTED)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   current_poll_id    Int?
+  phoneNumber        String?
 
   @@map("users")
 }
 
-enum RegistrationStatus {
+ enum RegistrationStatus {
   STARTED
   COMPLETED
 }
@@ -84,4 +89,9 @@ enum QuestionDifficulty {
   MEDIUM
   HARD
   EXPERT
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
 }

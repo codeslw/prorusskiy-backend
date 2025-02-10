@@ -10,6 +10,8 @@ import { UserService } from './users/user.service';
 import { ConfigModule } from '@nestjs/config';
 import { PollController } from './poll/poll.controller';
 import { PollModule } from './poll/poll.module';
+import { QuestionModule } from './question/question.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { PollModule } from './poll/poll.module';
       token: process.env.TELEGRAM_BOT_TOKEN,
     }),
     PollModule,
+    QuestionModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, TelegramBotUpdate, PollService, UserService],

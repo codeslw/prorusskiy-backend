@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "src/db/prisma.service";
 import { CreatePollDto } from "./dto/create-poll.dto";
 import { UpdatePollDto } from "./dto/update-poll.dto";
+import { CreatePollWithQuestionsDto } from "./dto/create-poll-with-questions.dto";
 
 @Injectable()
 export class PollRepository {
@@ -99,30 +100,48 @@ export class PollRepository {
     }
 
     async create(data: CreatePollDto) {
-        return await this.prisma.poll.create({
-            data: {
-                title: data.title,
-                questions: {
-                    create: data.questions.map(q => ({
-                        question: {
-                            create: {
-                                text: q.text,
-                                diffuculty: q.difficulty,
-                                answers: {
-                                    create: q.answers.map(a => ({
-                                        answer: {
-                                            create: {
-                                                text: a.text,
-                                                isCorrect: a.isCorrect
-                                            }
+        const createData: any = {
+            title: data.title,
+            questions: {
+                create: []
+            }
+        };
+
+        // Handle new questions
+        if (data.newQuestions?.length) {
+            createData.questions.create.push(
+                ...data.newQuestions.map(q => ({
+                    question: {
+                        create: {
+                            text: q.text,
+                            difficulty: q.difficulty,
+                            answers: {
+                                create: q.answers.map(a => ({
+                                    answer: {
+                                        create: {
+                                            text: a.text,
+                                            isCorrect: a.isCorrect
                                         }
-                                    }))
-                                }
+                                    }
+                                }))
                             }
                         }
-                    }))
-                }
-            },
+                    }
+                }))
+            );
+        }
+
+        // Handle existing questions
+        if (data.existingQuestionIds?.length) {
+            createData.questions.create.push(
+                ...data.existingQuestionIds.map(questionId => ({
+                    questionId
+                }))
+            );
+        }
+
+        return await this.prisma.poll.create({
+            data: createData,
             include: this.defaultInclude
         });
     }
@@ -133,7 +152,7 @@ export class PollRepository {
             updatedAt: new Date()
         };
 
-        if (data.questions) {
+        if (data.newQuestions || data.existingQuestionIds) {
             // Delete existing questions and their answers
             const poll = await this.findById(id);
             if (poll) {
@@ -149,25 +168,41 @@ export class PollRepository {
 
             // Create new questions and answers
             updateData.questions = {
-                create: data.questions.map(q => ({
-                    question: {
-                        create: {
-                            text: q.text,
-                            diffuculty: q.difficulty,
-                            answers: {
-                                create: q.answers.map(a => ({
-                                    answer: {
-                                        create: {
-                                            text: a.text,
-                                            isCorrect: a.isCorrect
+                create: []
+            };
+
+            // Handle new questions
+            if (data.newQuestions?.length) {
+                updateData.questions.create.push(
+                    ...data.newQuestions.map(q => ({
+                        question: {
+                            create: {
+                                text: q.text,
+                                difficulty: q.difficulty,
+                                answers: {
+                                    create: q.answers.map(a => ({
+                                        answer: {
+                                            create: {
+                                                text: a.text,
+                                                isCorrect: a.isCorrect
+                                            }
                                         }
-                                    }
-                                }))
+                                    }))
+                                }
                             }
                         }
-                    }
-                }))
-            };
+                    }))
+                );
+            }
+
+            // Handle existing questions
+            if (data.existingQuestionIds?.length) {
+                updateData.questions.create.push(
+                    ...data.existingQuestionIds.map(questionId => ({
+                        questionId
+                    }))
+                );
+            }
         }
 
         return await this.prisma.poll.update({
@@ -201,6 +236,30 @@ export class PollRepository {
         // Finally delete the poll
         return await this.prisma.poll.delete({
             where: { id }
+        });
+    }
+
+    async createWithExistingQuestions(data: CreatePollWithQuestionsDto) {
+        return await this.prisma.poll.create({
+            data: {
+                title: data.title,
+                questions: {
+                    create: data.questionIds.map(questionId => ({
+                        questionId
+                    }))
+                }
+            },
+            include: this.defaultInclude
+        });
+    }
+
+    async findQuestionsByIds(ids: number[]) {
+        return await this.prisma.question.findMany({
+            where: {
+                id: {
+                    in: ids
+                }
+            }
         });
     }
 }

@@ -1,5 +1,5 @@
 import { QuestionDifficulty } from "@prisma/client";
-import { IsString, IsArray, ValidateNested, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsArray, ValidateNested, IsOptional, IsEnum, IsNumber, IsBoolean, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -51,6 +51,12 @@ export class CreateQuestionDto {
     answers: CreateAnswerDto[];
 }
 
+export class QuestionReferenceDto {
+    @ApiProperty({ description: 'ID of an existing question' })
+    @IsNumber()
+    id: number;
+}
+
 export class CreatePollDto {
     @ApiProperty({ description: 'The title of the poll' })
     @IsString()
@@ -58,10 +64,20 @@ export class CreatePollDto {
 
     @ApiProperty({ 
         type: [CreateQuestionDto],
-        description: 'Array of questions in the poll'
+        description: 'Array of new questions to create'
     })
+    @ValidateIf(o => !o.existingQuestionIds?.length)
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => CreateQuestionDto)
-    questions: CreateQuestionDto[];
+    newQuestions?: CreateQuestionDto[];
+
+    @ApiProperty({ 
+        type: [Number],
+        description: 'Array of existing question IDs to include'
+    })
+    @ValidateIf(o => !o.newQuestions?.length)
+    @IsArray()
+    @IsNumber({}, { each: true })
+    existingQuestionIds?: number[];
 }

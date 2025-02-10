@@ -3,14 +3,16 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package*.json ./
-COPY prisma ./prisma/
 
+# Install python and build dependencies
+RUN apk add --no-cache python3 make g++ 
+
+# Install dependencies and rebuild bcrypt
 RUN npm install --legacy-peer-deps
+RUN npm rebuild bcrypt --build-from-source
 
 COPY . .
 
 RUN npm run build
 
-EXPOSE 3000
-
-CMD ["npm", "run", "start:prod"]
+CMD ["npm", "run", "start:dev"]

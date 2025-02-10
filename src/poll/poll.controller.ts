@@ -1,14 +1,22 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ValidationPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ValidationPipe, UseGuards } from '@nestjs/common';
 import { PollService } from './poll.service';
-import { CreatePollDto } from './dto/create-poll.dto';
+import { CreatePollDto, PollResponseDto } from './dto/create-poll.dto';
 import { UpdatePollDto } from './dto/update-poll.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Poll, Question, Answer } from '@prisma/client';
+import { CreatePollWithQuestionsDto } from './dto/create-poll-with-questions.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../auth/enums/user-role.enum';
+
 @ApiTags('Polls')
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('poll')
 export class PollController {
   constructor(private readonly pollService: PollService) {}
 
+  @Roles(UserRole.ADMIN)
   @Post()
   @ApiOperation({ summary: 'Create a new poll' })
   @ApiResponse({ status: 201, description: 'Poll has been successfully created.' })
@@ -17,12 +25,13 @@ export class PollController {
     return await this.pollService.create(createPollDto);
   }
 
+  @Roles(UserRole.ADMIN, UserRole.STUDENT)
   @Get()
   @ApiOperation({ summary: 'Get all polls' })
   @ApiQuery({ name: 'search', required: false, description: 'Search term for polls' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
   @ApiQuery({ name: 'size', required: false, description: 'Items per page' })
-  @ApiResponse({ status: 200, description: 'Return all polls.', type: [Poll] })
+  @ApiResponse({ status: 200, description: 'Return all polls.', type: () => [PollResponseDto] })
   async findAll(
     @Query('search') search?: string,
     @Query('page') page?: string,
@@ -76,5 +85,16 @@ export class PollController {
   @ApiResponse({ status: 404, description: 'Poll not found.' })
   async remove(@Param('id') id: string) {
     return await this.pollService.remove(+id);
+  }
+
+  @Post('with-questions')
+  @ApiOperation({ summary: 'Create a new poll with existing questions' })
+  @ApiResponse({ status: 201, description: 'Poll has been successfully created.' })
+  @ApiResponse({ status: 400, description: 'Bad Request.' })
+  @ApiResponse({ status: 404, description: 'One or more questions not found.' })
+  async createWithExistingQuestions(
+    @Body(new ValidationPipe()) createPollDto: CreatePollWithQuestionsDto
+  ) {
+    return await this.pollService.createWithExistingQuestions(createPollDto);
   }
 }
