@@ -40,29 +40,47 @@ export class AuthService {
   }
 
   async requestVerification(dto: StudentVerificationRequestDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { username: dto.username }
+    // First find user by phone number
+    const user = await this.prisma.user.findFirst({
+        where: { 
+            phoneNumber: dto.phoneNumber,
+            role: 'STUDENT'
+        }
     });
 
-    if (!user || user.role !== 'STUDENT') {
-      throw new UnauthorizedException('Invalid credentials');
+    if (!user || !user.telegramId) {
+        return {
+            success: false,
+            message: 'User not found or Telegram ID not linked'
+        };
     }
 
     const verificationCode = Math.random().toString().slice(-6);
-    const verificationExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const verificationExpiry = new Date(Date.now() + 15 * 60 * 1000);
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        verificationCode,
-        verificationExpiry
-      }
-    });
+    try {
+        await this.sendTelegramVerification(user.telegramId, verificationCode);
+        
+        // Update user with verification code
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                verificationCode,
+                verificationExpiry
+            }
+        });
 
-    // TODO: Integrate with SMS service to send verification code
-    // await smsService.send(dto.phoneNumber, `Your verification code is: ${verificationCode}`);
-
-    return { message: 'Verification code sent to your phone number' };
+        return {
+            success: true,
+            message: 'Verification code sent to your Telegram account'
+        };
+    } catch (error) {
+        return {
+            success: false,
+            message: 'Failed to send verification code to Telegram',
+            error: error.message
+        };
+    }
   }
 
   async verifyStudent(dto: StudentVerificationDto) {
@@ -107,5 +125,29 @@ export class AuthService {
         role: user.role
       }
     };
+  }
+
+  private async sendTelegramVerification(telegramId: string, code: string): Promise<void> {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+        throw new Error('TELEGRAM_BOT_TOKEN not configured');
+    }
+
+    const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            chat_id: telegramId,
+            text: `Your verification code is: ${code}`
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Telegram API error: ${error.description || response.statusText}`);
+    }
   }
 } 

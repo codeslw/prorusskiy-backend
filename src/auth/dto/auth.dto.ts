@@ -6,18 +6,18 @@ export class AdminLoginDto {
     @IsString()
     username: string;
 
-    @ApiProperty({ example: 'password123' })
+    @ApiProperty({ example: 'admin123' })
     @IsString()
     @MinLength(6)
     password: string;
 }
 
 export class StudentVerificationRequestDto {
-    @ApiProperty({ example: 'student1' })
+    @ApiProperty({ example: '123456789' })
     @IsString()
-    username: string;
+    telegramId: string;
 
-    @ApiProperty({ example: '+77071234567' })
+    @ApiProperty({ example: '+998940992774' })
     @IsString()
     @Matches(/^\+[1-9]\d{10,14}$/, { message: 'Phone number must be in international format' })
     phoneNumber: string;

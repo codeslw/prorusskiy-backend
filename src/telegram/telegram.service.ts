@@ -12,12 +12,13 @@ export class TelegramBotUpdate {
     private readonly userService: UserService) {}
 
   private registrationSteps = new Map<string, {
-    step: 'USERNAME' | 'FIRSTNAME' | 'LASTNAME' | 'AGE',
+    step: 'FULLNAME' | 'PHONE' | 'AGE',
     data: Partial<{
       telegramId: string,
       username: string,
       firstName: string,
       lastName: string,
+      phoneNumber: string,
       age: number
     }>
   }>();
@@ -32,15 +33,34 @@ export class TelegramBotUpdate {
     const telegramId = ctx.from?.id.toString();
     if (!telegramId) return;
 
-    // Start registration process
-    this.registrationSteps.set(telegramId, {
-      step: 'USERNAME',
-      data: { telegramId }
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { telegramId }
     });
 
-    await ctx.reply('Welcome! Let\'s register you.');
-    await ctx.reply('Please choose a unique username:');
+    if (existingUser) {
+      await ctx.reply(`Welcome back, ${existingUser.firstName}! 
+        \nYour profile:
+        \nUsername: ${existingUser.username}
+        \nPhone: ${existingUser.phoneNumber || 'Not provided'}
+        \nRole: ${existingUser.role}
+        \n\nUse /help to see available commands.`);
+      return;
+    }
+
+    // Start registration process
+    this.registrationSteps.set(telegramId, {
+      step: 'FULLNAME',
+      data: { 
+        telegramId,
+        username: ctx.from.username || `user_${telegramId}`
+      }
+    });
+
+    await ctx.reply('Welcome! Let\'s complete your registration.');
+    await ctx.reply('Please enter your full name (e.g., "John Smith"):');
   }
+
   @On('text')
   async handleRegistration(@Ctx() ctx: Context) {
     const telegramId = ctx.from?.id.toString();
@@ -52,38 +72,35 @@ export class TelegramBotUpdate {
     if (!registrationState) return;
 
     switch (registrationState.step) {
-      case 'USERNAME':
-        try {
-          const isAvailable = await this.userService.checkUsernameAvailability(message);
-          if (!isAvailable) {
-            await ctx.reply('Username is already taken. Please choose another:');
-            return;
-          }
-
-          registrationState.data.username = message;
-          registrationState.step = 'FIRSTNAME';
-          await ctx.reply('Enter your first name:');
-        } catch (error) {
-          await ctx.reply('Error with username. Please try again:');
+      case 'FULLNAME':
+        const nameParts = message.trim().split(' ');
+        if (nameParts.length < 2) {
+          await ctx.reply('Please enter both your first and last name separated by space:');
+          return;
         }
+
+        registrationState.data.firstName = nameParts[0];
+        registrationState.data.lastName = nameParts.slice(1).join(' ');
+        registrationState.step = 'PHONE';
+        await ctx.reply('Please enter your phone number in international format (e.g., +998940992774):');
         break;
 
-      case 'FIRSTNAME':
-        registrationState.data.firstName = message;
-        registrationState.step = 'LASTNAME';
-        await ctx.reply('Enter your last name:');
-        break;
+      case 'PHONE':
+        const phoneRegex = /^\+[1-9]\d{10,14}$/;
+        if (!phoneRegex.test(message)) {
+          await ctx.reply('Invalid phone number format. Please use international format (e.g., +998940992774):');
+          return;
+        }
 
-      case 'LASTNAME':
-        registrationState.data.lastName = message;
+        registrationState.data.phoneNumber = message;
         registrationState.step = 'AGE';
-        await ctx.reply('Enter your age:');
+        await ctx.reply('Please enter your age:');
         break;
 
       case 'AGE':
         const age = parseInt(message);
         if (isNaN(age) || age < 1 || age > 120) {
-          await ctx.reply('Invalid age. Please enter a valid age:');
+          await ctx.reply('Invalid age. Please enter a number between 1 and 120:');
           return;
         }
 
@@ -91,15 +108,47 @@ export class TelegramBotUpdate {
 
         // Complete registration
         try {
-          await this.userService.registerUser(registrationState.data as any);
-          await ctx.reply('Registration complete!');
+          const user = await this.userService.registerUser({
+            telegramId: registrationState.data.telegramId!,
+            username: registrationState.data.username!,
+            firstName: registrationState.data.firstName!,
+            lastName: registrationState.data.lastName!,
+            phoneNumber: registrationState.data.phoneNumber!,
+            age: registrationState.data.age!,
+            role: 'STUDENT' as const,
+            registrationStatus: 'STARTED' as const
+          });
+
           this.registrationSteps.delete(telegramId);
+
+          await ctx.reply(`Registration complete! 
+            \nWelcome ${user.firstName}!
+            \n\nYour profile:
+            \nUsername: ${user.username}
+            \nAge: ${user.age}
+            \nPhone: ${user.phoneNumber}
+            \n\nWhat's next:
+            1. You can verify your phone number through our web application
+            2. After verification, you'll be able to take quizzes
+            3. Use /help to see all available commands
+            \nWeb app: https://your-quiz-app.com`);
+
         } catch (error) {
-            console.log(error, " error");
-          await ctx.reply('Registration failed. Please start over with /start');
+          console.error('Registration error:', error);
+          await ctx.reply('Registration failed. Please try again with /start');
         }
         break;
     }
+  }
+
+  @Help()
+  async help(@Ctx() ctx: Context) {
+    await ctx.reply(`Available commands:
+      \n/start - Start registration or view profile
+      \n/help - Show this help message
+      \n/profile - View your profile
+      \n/start_poll - Start a quiz (if assigned)
+      \n\nNeed assistance? Contact support: @support_username`);
   }
 
  @Command('assign_poll')
